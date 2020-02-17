@@ -15,11 +15,15 @@ class AdsControls extends StatefulWidget {
     @required this.backgroundColor,
     @required this.iconColor,
     this.skipDuration,
+    this.loadingMessage,
+    this.loadingMessageDot,
   });
 
   final Color backgroundColor;
   final Color iconColor;
   final Duration skipDuration;
+  final String loadingMessage;
+  final String loadingMessageDot;
 
   @override
   State<StatefulWidget> createState() {
@@ -80,6 +84,7 @@ class _AdsControlsState extends State<AdsControls> {
             children: <Widget>[
               _buildTopBar(
                   backgroundColor, iconColor, barHeight, buttonPadding),
+              _buildHitArea(backgroundColor, iconColor),
             ],
           ),
         ),
@@ -114,6 +119,25 @@ class _AdsControlsState extends State<AdsControls> {
     super.didChangeDependencies();
   }
 
+  Expanded _buildHitArea(Color backgroundColor, Color iconColor) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: _latestValue != null && _latestValue.isPlaying
+            ? _cancelAndRestartTimer
+            : () {
+                _hideTimer?.cancel();
+
+                if (mounted) {
+                  setState(() {
+                    _hideStuff = false;
+                  });
+                }
+              },
+        child: Center(child: _buildLoading(backgroundColor, iconColor)),
+      ),
+    );
+  }
+
   Widget _buildLoading(Color backgroundColor, Color iconColor) {
     return _latestValue.isBuffering || _latestValue.duration == null
         ? AnimatedOpacity(
@@ -131,7 +155,8 @@ class _AdsControlsState extends State<AdsControls> {
                   height: 120,
                   child: LoadingMessageIndicator(
                     color: iconColor,
-                    message: 'ロード中',
+                    message: widget.loadingMessage,
+                    messageDot: widget.loadingMessageDot,
                   ),
                 ),
               ),

@@ -5,11 +5,17 @@ import 'package:flutter/material.dart';
 
 class LoadingMessageIndicator extends StatefulWidget {
   const LoadingMessageIndicator(
-      {Key key, this.color, this.message, this.textStyle, this.spacing})
+      {Key key,
+      this.color,
+      this.message,
+      this.textStyle,
+      this.spacing,
+      this.messageDot})
       : super(key: key);
 
   final Color color;
   final String message;
+  final String messageDot;
   final TextStyle textStyle;
   final double spacing;
 
@@ -43,7 +49,7 @@ class _LoadingMessageIndicatorState extends State<LoadingMessageIndicator>
   String _renderDot({int amount = 0}) {
     String result = '';
     for (int i = 0; i < amount; i++) {
-      result += '。';
+      result += (widget.messageDot ?? '.');
     }
     return result;
   }
@@ -67,7 +73,7 @@ class _LoadingMessageIndicatorState extends State<LoadingMessageIndicator>
           height: widget.spacing ?? 10,
         ),
         Text(
-          (widget.message ?? 'ロード中') + _renderDot(amount: amountDots),
+          (widget.message ?? 'Buffering') + _renderDot(amount: amountDots),
           style: widget.textStyle ??
               textTheme.body1
                   .merge(TextStyle(color: widget.color ?? Colors.white)),
