@@ -2,23 +2,26 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:chewie/src/chewie_player.dart';
-import 'package:chewie/src/chewie_progress_colors.dart';
-import 'package:chewie/src/cupertino_progress_bar.dart';
-import 'package:chewie/src/utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:open_iconic_flutter/open_iconic_flutter.dart';
 import 'package:video_player/video_player.dart';
 
+import '../chewie.dart';
+import 'cupertino_progress_bar.dart';
+import 'loadingMessageIndicator.dart';
+import 'utils.dart';
+
 class CupertinoControls extends StatefulWidget {
   const CupertinoControls({
     @required this.backgroundColor,
     @required this.iconColor,
+    this.skipDuration,
   });
 
   final Color backgroundColor;
   final Color iconColor;
+  final Duration skipDuration;
 
   @override
   State<StatefulWidget> createState() {
@@ -79,7 +82,7 @@ class _CupertinoControlsState extends State<CupertinoControls> {
             children: <Widget>[
               _buildTopBar(
                   backgroundColor, iconColor, barHeight, buttonPadding),
-              _buildHitArea(),
+              _buildHitArea(backgroundColor, iconColor),
               _buildBottomBar(backgroundColor, iconColor, barHeight),
             ],
           ),
@@ -162,6 +165,32 @@ class _CupertinoControlsState extends State<CupertinoControls> {
     );
   }
 
+  Widget _buildLoading(Color backgroundColor, Color iconColor) {
+    return _latestValue.isBuffering || _latestValue.duration == null
+        ? AnimatedOpacity(
+            opacity: _latestValue.isBuffering || _latestValue.duration == null
+                ? 1.0
+                : 0.0,
+            duration: Duration(milliseconds: 300),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10.0),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 10.0),
+                child: Container(
+                  color: backgroundColor,
+                  width: 120,
+                  height: 120,
+                  child: LoadingMessageIndicator(
+                    color: iconColor,
+                    message: 'ロード中',
+                  ),
+                ),
+              ),
+            ),
+          )
+        : Container();
+  }
+
   Widget _buildLive(Color iconColor) {
     return Padding(
       padding: EdgeInsets.only(right: 12.0),
@@ -210,7 +239,7 @@ class _CupertinoControlsState extends State<CupertinoControls> {
     );
   }
 
-  Expanded _buildHitArea() {
+  Expanded _buildHitArea(Color backgroundColor, Color iconColor) {
     return Expanded(
       child: GestureDetector(
         onTap: _latestValue != null && _latestValue.isPlaying
@@ -218,13 +247,13 @@ class _CupertinoControlsState extends State<CupertinoControls> {
             : () {
                 _hideTimer?.cancel();
 
-                setState(() {
-                  _hideStuff = false;
-                });
+                if (mounted) {
+                  setState(() {
+                    _hideStuff = false;
+                  });
+                }
               },
-        child: Container(
-          color: Colors.transparent,
-        ),
+        child: Center(child: _buildLoading(backgroundColor, iconColor)),
       ),
     );
   }
@@ -412,11 +441,13 @@ class _CupertinoControlsState extends State<CupertinoControls> {
   void _cancelAndRestartTimer() {
     _hideTimer?.cancel();
 
-    setState(() {
-      _hideStuff = false;
+    if (mounted) {
+      setState(() {
+        _hideStuff = false;
 
-      _startHideTimer();
-    });
+        _startHideTimer();
+      });
+    }
   }
 
   Future<Null> _initialize() async {
@@ -431,24 +462,27 @@ class _CupertinoControlsState extends State<CupertinoControls> {
 
     if (chewieController.showControlsOnInitialize) {
       _initTimer = Timer(Duration(milliseconds: 200), () {
-        setState(() {
-          _hideStuff = false;
-        });
+        if (mounted)
+          setState(() {
+            _hideStuff = false;
+          });
       });
     }
   }
 
   void _onExpandCollapse() {
-    setState(() {
-      _hideStuff = true;
+    if (mounted)
+      setState(() {
+        _hideStuff = true;
 
-      chewieController.toggleFullScreen();
-      _expandCollapseTimer = Timer(Duration(milliseconds: 300), () {
-        setState(() {
-          _cancelAndRestartTimer();
+        chewieController.toggleFullScreen();
+        _expandCollapseTimer = Timer(Duration(milliseconds: 300), () {
+          if (mounted)
+            setState(() {
+              _cancelAndRestartTimer();
+            });
         });
       });
-    });
   }
 
   Widget _buildProgressBar() {
@@ -496,55 +530,66 @@ class _CupertinoControlsState extends State<CupertinoControls> {
   }
 
   void _playPause() {
-    bool isFinished = _latestValue.position >= _latestValue.duration;
+    bool isFinished = _latestValue.position >=
+        (_latestValue.duration ?? Duration(seconds: 0));
 
-    setState(() {
-      if (controller.value.isPlaying) {
-        _hideStuff = false;
-        _hideTimer?.cancel();
-        controller.pause();
-      } else {
-        _cancelAndRestartTimer();
-
-        if (!controller.value.initialized) {
-          controller.initialize().then((_) {
-            controller.play();
-          });
+    if (mounted)
+      setState(() {
+        if (controller.value.isPlaying) {
+          _hideStuff = false;
+          _hideTimer?.cancel();
+          controller.pause();
         } else {
-          if (isFinished) {
-            controller.seekTo(Duration(seconds: 0));
+          _cancelAndRestartTimer();
+
+          if (!controller.value.initialized) {
+            controller.initialize().then((_) {
+              controller.play();
+            });
+          } else {
+            if (isFinished) {
+              controller.seekTo(Duration(seconds: 0));
+            }
+            controller.play();
           }
-          controller.play();
         }
-      }
-    });
+      });
   }
 
   void _skipBack() {
     _cancelAndRestartTimer();
+    if (_latestValue.duration == null) return;
     final beginning = Duration(seconds: 0).inMilliseconds;
-    final skip = (_latestValue.position - Duration(seconds: 15)).inMilliseconds;
+    final skip =
+        (_latestValue.position - (widget.skipDuration ?? Duration(seconds: 10)))
+            .inMilliseconds;
     controller.seekTo(Duration(milliseconds: math.max(skip, beginning)));
   }
 
   void _skipForward() {
     _cancelAndRestartTimer();
+    if (_latestValue.duration == null) return;
+
     final end = _latestValue.duration.inMilliseconds;
-    final skip = (_latestValue.position + Duration(seconds: 15)).inMilliseconds;
+    final skip =
+        (_latestValue.position + (widget.skipDuration ?? Duration(seconds: 10)))
+            .inMilliseconds;
     controller.seekTo(Duration(milliseconds: math.min(skip, end)));
   }
 
   void _startHideTimer() {
     _hideTimer = Timer(const Duration(seconds: 3), () {
-      setState(() {
-        _hideStuff = true;
-      });
+      if (mounted)
+        setState(() {
+          _hideStuff = true;
+        });
     });
   }
 
   void _updateState() {
-    setState(() {
-      _latestValue = controller.value;
-    });
+    if (mounted)
+      setState(() {
+        _latestValue = controller.value;
+      });
   }
 }
