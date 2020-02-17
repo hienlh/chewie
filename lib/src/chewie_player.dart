@@ -193,6 +193,7 @@ class ChewieController extends ChangeNotifier {
       DeviceOrientation.landscapeRight,
     ],
     this.routePageBuilder = null,
+    this.onInitialFailure,
   }) : assert(videoPlayerController != null,
             'You must provide a controller to play a video') {
     _initialize();
@@ -272,6 +273,9 @@ class ChewieController extends ChangeNotifier {
   /// Defines a custom RoutePageBuilder for the fullscreen
   final ChewieRoutePageBuilder routePageBuilder;
 
+  /// A callback will be called when initialize video play fail.
+  final Function(dynamic) onInitialFailure;
+
   static ChewieController of(BuildContext context) {
     final chewieControllerProvider =
         context.inheritFromWidgetOfExactType(_ChewieControllerProvider)
@@ -289,7 +293,12 @@ class ChewieController extends ChangeNotifier {
 
     if ((autoInitialize || autoPlay) &&
         !videoPlayerController.value.initialized) {
-      await videoPlayerController.initialize();
+      try {
+        await videoPlayerController.initialize();
+      } catch (e) {
+        onInitialFailure?.call(e);
+        return;
+      }
     }
 
     if (autoPlay) {

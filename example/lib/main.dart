@@ -35,6 +35,9 @@ class _ChewieDemoState extends State<ChewieDemo> {
     _videoPlayerController2 = VideoPlayerController.network(
         'https://www.sample-videos.com/video123/mp4/480/asdasdas.mp4');
     _chewieController = ChewieController(
+      onInitialFailure: (dynamic e) {
+        print(e);
+      },
       videoPlayerController: _videoPlayerController1,
       aspectRatio: 3 / 2,
       autoPlay: true,
